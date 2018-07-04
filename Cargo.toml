@@ -1,0 +1,16 @@
+[package]
+name = "rabbitc"
+version = "0.1.0"
+authors = ["Nedim Šabić <bhnedo@hotmail.com>"]
+
+[dependencies]
+nix = "0.10.0"
+libc = "0.2.40"
+clap = "2.31.2"
+log = "0.4"
+pretty_env_logger = "0.2"
+pnetlink = "0.0.3"
+pnet_macros_support = "0.21"
+ipaddress = "0.1.1"
+rand = "0.5.0"
+num = "0.1.42"
