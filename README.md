@@ -6,7 +6,7 @@
 
 Rust toolchain is required to build `rabbitc`. Clone this repository and run `cargo build --release`.
 
-Run `rabbitc --help` to see availalbe options.
+`rabbitc --help` prints all availalbe options.
 
 ```bash
 OPTIONS:
