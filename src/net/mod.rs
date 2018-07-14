@@ -1,12 +1,12 @@
 pub mod bridge;
 mod netlink;
 
-use rand;
-use rand::Rng;
+use rand::{self, Rng};
+use rand::distributions::Alphanumeric;
 
 pub fn generate_ifname(len: usize) -> String {
    rand::thread_rng()
-        .gen_ascii_chars()
+        .sample_iter(&Alphanumeric)
         .take(len)
         .collect::<String>()
 }
