@@ -1,6 +1,6 @@
 # rabbitc
 
-**rabbitc** is the micro container runtime meant for learning purposes. For more information please read the blog [post](http://rabbitstack.github.io/operating%20systems/containers/linux-container-internals-part-ii/).
+**rabbitc** is the micro container runtime meant for learning purposes. For more information, read the blog [post](http://rabbitstack.github.io/operating%20systems/containers/linux-container-internals-part-ii/).
 
 ## Building
 
