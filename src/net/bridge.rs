@@ -13,8 +13,8 @@
 // License for the specific language governing permissions and limitations
 // under the License.
 
-use pnetlink::packet::netlink::{NetlinkConnection};
-use pnetlink::packet::route::link::{Links};
+use pnetlink::packet::netlink::NetlinkConnection;
+use pnetlink::packet::route::link::Links;
 use pnetlink::packet::route::addr::{Addresses, Scope};
 use net::netlink::bridge::Bridge;
 use net::netlink::veth::Veth;
@@ -31,9 +31,11 @@ use std::io;
 pub fn init(name: &str, ipv4: &str) -> io::Result<()> {
     let mut conn = NetlinkConnection::new();
     match conn.new_bridge(name) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            if e.kind() == io::ErrorKind::AlreadyExists { return Ok(()); }
+            if e.kind() == io::ErrorKind::AlreadyExists {
+                return Ok(());
+            }
             return Err(e);
         }
     }
@@ -43,7 +45,8 @@ pub fn init(name: &str, ipv4: &str) -> io::Result<()> {
     conn.link_set_up(bridge.get_index())?;
 
     // bind ip address
-    let ip = IPAddress::parse(ipv4).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+    let ip =
+        IPAddress::parse(ipv4).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
     conn.add_addr(
         &bridge,
         IpAddr::from_str(ip.to_s().as_str()).unwrap(),
@@ -90,7 +93,8 @@ pub fn setup_peer(peer: &str, container_ip: &str) -> io::Result<()> {
     let lo = conn.get_link_by_name("lo")?.unwrap();
     conn.link_set_up(lo.get_index())?;
 
-    let ip = IPAddress::parse(container_ip).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+    let ip = IPAddress::parse(container_ip)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
     conn.add_addr(
         &link,
         IpAddr::from_str(ip.to_s().as_str()).unwrap(),

@@ -13,8 +13,9 @@
 // License for the specific language governing permissions and limitations
 // under the License.
 
-use pnetlink::packet::netlink::{NetlinkConnection, NetlinkRequestBuilder, NetlinkReader};
-use pnetlink::packet::route::link::{IfInfoPacketBuilder, IFLA_IFNAME, IFLA_LINKINFO, IFLA_INFO_KIND, RTM_NEWLINK};
+use pnetlink::packet::netlink::{NetlinkConnection, NetlinkReader, NetlinkRequestBuilder};
+use pnetlink::packet::route::link::{IfInfoPacketBuilder, IFLA_IFNAME, IFLA_INFO_KIND,
+                                    IFLA_LINKINFO, RTM_NEWLINK};
 use pnetlink::packet::route::RtAttrPacket;
 use pnetlink::packet::route::route::WithPayload;
 use pnetlink::packet::netlink::NetlinkMsgFlags;
@@ -32,13 +33,20 @@ impl Bridge for NetlinkConnection {
     /// Creates a new bridge kernel device.
     fn new_bridge(&mut self, name: &str) -> io::Result<()> {
         let ifi = {
-            IfInfoPacketBuilder::new().
-                append(RtAttrPacket::create_with_payload(IFLA_IFNAME, name)).
-                append(RtAttrPacket::create_with_payload(
-                    IFLA_LINKINFO, RtAttrPacket::create_with_payload(IFLA_INFO_KIND, "bridge"))).build()
+            IfInfoPacketBuilder::new()
+                .append(RtAttrPacket::create_with_payload(IFLA_IFNAME, name))
+                .append(RtAttrPacket::create_with_payload(
+                    IFLA_LINKINFO,
+                    RtAttrPacket::create_with_payload(IFLA_INFO_KIND, "bridge"),
+                ))
+                .build()
         };
-        let req = NetlinkRequestBuilder::new(RTM_NEWLINK, NetlinkMsgFlags::NLM_F_CREATE | NetlinkMsgFlags::NLM_F_EXCL | NetlinkMsgFlags::NLM_F_ACK)
-            .append(ifi).build();
+        let req = NetlinkRequestBuilder::new(
+            RTM_NEWLINK,
+            NetlinkMsgFlags::NLM_F_CREATE | NetlinkMsgFlags::NLM_F_EXCL
+                | NetlinkMsgFlags::NLM_F_ACK,
+        ).append(ifi)
+            .build();
         self.write(req.packet())?;
         let reader = NetlinkReader::new(self);
         reader.read_to_end()
