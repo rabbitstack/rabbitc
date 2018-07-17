@@ -13,30 +13,24 @@
 // License for the specific language governing permissions and limitations
 // under the License.
 
-extern crate nix;
 extern crate clap;
-extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
-extern crate pnetlink;
+extern crate nix;
 extern crate pnet_macros_support;
+extern crate pnetlink;
+extern crate pretty_env_logger;
 
 extern crate ipaddress;
-extern crate rand;
 extern crate num;
+extern crate rand;
 
-use clap::{Arg, App};
+use clap::{App, Arg};
 
 use nix::sched::*;
-use nix::{Result, Error};
+use nix::{Error, Result};
 use nix::sched::clone;
-use nix::unistd::{
-    chdir,
-    mkdir,
-    execve,
-    pivot_root,
-    sethostname,
-};
+use nix::unistd::{chdir, execve, mkdir, pivot_root, sethostname};
 use nix::mount::*;
 use std::ffi::CString;
 use std::path::Path;
@@ -56,50 +50,61 @@ fn main() {
         .version("0.1.0")
         .about("Micro container runtime")
         .author("Nedim Šabić")
-        .arg(Arg::with_name("rootfs")
-            .required(true)
-            .short("r")
-            .long("rootfs")
-            .multiple(false)
-            .takes_value(true)
-            .help("Root file system path for the container"))
-        .arg(Arg::with_name("hostname")
-            .short("h")
-            .long("hostname")
-            .multiple(false)
-            .default_value("rabbitc")
-            .help("Container host name"))
-        .arg(Arg::with_name("cmd")
-            .short("c")
-            .long("cmd")
-            .multiple(false)
-            .default_value("/bin/sh")
-            .help("Command that is run inside container"))
-        .arg(Arg::with_name("network-name")
-            .short("n")
-            .long("network-name")
-            .multiple(false)
-            .default_value("rabbitc0")
-            .help("The name of the bridge device where containers are connected"))
-        .arg(Arg::with_name("network-ip")
-            .short("i")
-            .long("network-ip")
-            .multiple(false)
-            .default_value("172.19.0.1/16")
-            .help("The default IP address for the bridge device in CIDR notation"))
-        .arg(Arg::with_name("container-ip")
-            .short("t")
-            .long("container-ip")
-            .multiple(false)
-            .default_value("172.19.0.2/16")
-            .help("The default IP address for container in CIDR notation"))
+        .arg(
+            Arg::with_name("rootfs")
+                .required(true)
+                .short("r")
+                .long("rootfs")
+                .multiple(false)
+                .takes_value(true)
+                .help("Root file system path for the container"),
+        )
+        .arg(
+            Arg::with_name("hostname")
+                .short("h")
+                .long("hostname")
+                .multiple(false)
+                .default_value("rabbitc")
+                .help("Container host name"),
+        )
+        .arg(
+            Arg::with_name("cmd")
+                .short("c")
+                .long("cmd")
+                .multiple(false)
+                .default_value("/bin/sh")
+                .help("Command that is run inside container"),
+        )
+        .arg(
+            Arg::with_name("network-name")
+                .short("n")
+                .long("network-name")
+                .multiple(false)
+                .default_value("rabbitc0")
+                .help("The name of the bridge device where containers are connected"),
+        )
+        .arg(
+            Arg::with_name("network-ip")
+                .short("i")
+                .long("network-ip")
+                .multiple(false)
+                .default_value("172.19.0.1/16")
+                .help("The default IP address for the bridge device in CIDR notation"),
+        )
+        .arg(
+            Arg::with_name("container-ip")
+                .short("t")
+                .long("container-ip")
+                .multiple(false)
+                .default_value("172.19.0.2/16")
+                .help("The default IP address for container in CIDR notation"),
+        )
         .get_matches();
 
     let net_name = matches.value_of("network-name").unwrap();
-    bridge::init(
-        net_name,
-        matches.value_of("network-ip").unwrap(),
-    );
+    if let Err(e) = bridge::init(net_name, matches.value_of("network-ip").unwrap()) {
+        warn!("unable to initialize bridge network {}", e);
+    }
 
     let rootfs = matches.value_of("rootfs").unwrap();
     if !Path::new(&rootfs).exists() {
@@ -120,18 +125,9 @@ fn main() {
 /// Also ensures to prevent mount namespace propagation which is mandatory for a successful outcome
 /// of the `pivot_root` syscall. Setups a network adapter for container and connects it to in kernel
 /// bridge device. Then waits for the container process to finish.
-fn runc(
-    rootfs: &str,
-    hostname: &str,
-    container_ip: &str,
-    net_name: &str,
-    cmd: &str,
-) -> Result<()> {
-    let clone_flags = CloneFlags::CLONE_NEWUTS |
-        CloneFlags::CLONE_NEWPID |
-        CloneFlags::CLONE_NEWNS |
-        CloneFlags::CLONE_NEWIPC |
-        CloneFlags::CLONE_NEWNET;
+fn runc(rootfs: &str, hostname: &str, container_ip: &str, net_name: &str, cmd: &str) -> Result<()> {
+    let clone_flags = CloneFlags::CLONE_NEWUTS | CloneFlags::CLONE_NEWPID | CloneFlags::CLONE_NEWNS
+        | CloneFlags::CLONE_NEWIPC | CloneFlags::CLONE_NEWNET;
 
     // set root mount namespace propagation to private.
     // This prevents leaking mounts in the container to
@@ -141,21 +137,15 @@ fn runc(
         "/",
         None::<&str>,
         MsFlags::MS_REC | MsFlags::MS_PRIVATE,
-        None::<&str>
+        None::<&str>,
     )?;
 
     let peer_iface = net::generate_ifname(7);
-    bridge::create_veth(&peer_iface, net_name);
+    bridge::create_veth(&peer_iface, net_name).map_err(|_| nix::Error::UnsupportedOperation)?;
 
-    let stack = &mut[0; 1024 * 1024];
+    let stack = &mut [0; 1024 * 1024];
     let cb = Box::new(|| {
-        if let Err(e) = init_container(
-            rootfs,
-            hostname,
-            cmd,
-            &peer_iface,
-            container_ip,
-        ) {
+        if let Err(e) = init_container(rootfs, hostname, cmd, &peer_iface, container_ip) {
             error!("unable to initialize container: {}", e);
             -1
         } else {
@@ -163,18 +153,11 @@ fn runc(
         }
     });
 
-    let child = clone(
-        cb,
-        stack,
-        clone_flags,
-        None,
-    )?;
+    let child = clone(cb, stack, clone_flags, None)?;
 
     // move peer interface to container network namespace
-    bridge::join(
-        &peer_iface,
-        child.to_string().parse::<u32>().unwrap()
-    ).map_err(|_| nix::Error::UnsupportedOperation)?;
+    bridge::join(&peer_iface, child.to_string().parse::<u32>().unwrap())
+        .map_err(|_| nix::Error::UnsupportedOperation)?;
 
     // give child process a chance to boot
     thread::sleep(time::Duration::from_millis(300));
@@ -213,14 +196,14 @@ fn init_rootfs(rootfs: &str) -> Result<()> {
         rootfs,
         None::<&str>,
         MsFlags::MS_BIND | MsFlags::MS_REC,
-        None::<&str>
+        None::<&str>,
     )?;
 
     let prev_rootfs = Path::new(rootfs).join(".oldrootfs");
     std::fs::remove_dir_all(&prev_rootfs).map_err(|_| Error::InvalidPath)?;
     mkdir(
         &prev_rootfs,
-        stat::Mode::S_IRWXU | stat::Mode::S_IRWXG | stat::Mode::S_IRWXO
+        stat::Mode::S_IRWXU | stat::Mode::S_IRWXG | stat::Mode::S_IRWXO,
     )?;
 
     pivot_root(rootfs, &prev_rootfs)?;
@@ -235,7 +218,7 @@ fn init_rootfs(rootfs: &str) -> Result<()> {
         "/proc",
         Some("proc"),
         MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV | MsFlags::MS_RELATIME,
-        None::<&str>
+        None::<&str>,
     )?;
 
     // mount tmpfs on /dev and create some devices
